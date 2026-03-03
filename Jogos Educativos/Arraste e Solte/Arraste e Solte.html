@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Coleta Seletiva</title>
+    <style>
+
+	/* Efeito de flutuação suave para os resíduos */
+@keyframes float {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    25% {
+        transform: translate(5%, -5%) scale(1.02);
+    }
+    50% {
+        transform: translate(0, 5%) scale(1.05);
+    }
+    75% {
+        transform: translate(-5%, -5%) scale(1.03);
+    }
+}
+	
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #4CAF50, #2196F3);
+            color: #333;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            color: #e0e0e0;
+            margin-bottom: 20px;
+            z-index: 1;
+        }
+
+        #score-container, #level-container {
+            font-size: 1.5em; /* Aumentei para ambos para maior visibilidade */
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #90ee90;
+            z-index: 1;
+        }
+        #level-container {
+            color: #e0e0e0; /* Mantém a cor original do nível */
+        }
+
+        /* --- Video Introduction Container --- */
+        #video-intro-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95); /* Quase preto para focar no vídeo */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200; /* Acima de tudo */
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #video-intro-container p {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #video-intro-container iframe {
+            max-width: 90%;
+            width: 1280px; /* Base width */
+            max-height: 70vh; /* Limit height to 70% of viewport height */
+            height: 720px; /* Base height */
+            aspect-ratio: 16 / 9; /* Maintain aspect ratio */
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.4); /* Green glow */
+            margin-bottom: 25px;
+        }
+
+        #skip-video-btn {
+            padding: 15px 30px;
+            font-size: 1.3em;
+            background-color: #28a745; /* Green for "Go" */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        #skip-video-btn:hover {
+            background-color: #218838;
+            transform: translateY(-2px);
+        }
+
+        /* --- Game Container --- */
+        #game-container {
+            display: none; /* Initially hidden, shown after video */
+            flex-direction: column;
+            width: 95%;
+            max-width: 2500px;
+            border-radius: 10px;
+            min-height: 1000px; /* Aumentei a altura para acomodar os dois blocos */
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            justify-content: space-between;
+            box-sizing: border-box; /* Garante que padding e border sejam incluídos na width/height total */
+        }
+
+        /* These elements should also be hidden initially with the game-container */
+        #score-container, #level-container, h1, #progress-container {
+            display: none;
+        }
+
+        /* --- Resíduos Container --- */
+        #residues-container {
+            flex: 1;
+            width: 100%;
+            padding: 40px; /* Um padding de 40px em todos os lados. Ajuste o valor conforme achar melhor */
+            position: relative;
+            z-index: 10;
+            border-right: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            box-sizing: border-box; /* Garante que padding e border sejam incluídos na width/height total */
+        }
+
+        .residue {
+            /* Autoajustável com um tamanho máximo */
+            width: 10vw; /* Largura baseada em 12% da largura do viewport */
+            height: 12vw; /* Altura baseada em 12% da largura do viewport (mantém proporção) */
+            max-width: 200px; /* Garante que não fiquem maiores que 220px em telas muito grandes */
+            max-height: 220px; /* Garante que não fiquem maiores que 220px em telas muito grandes */
+            min-width: 100px; /* Impede que fiquem menores que 100px em telas muito pequenas */
+            min-height: 100px; /* Impede que fiquem menores que 100px em telas muito pequenas */
+
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: grab;
+            transition: opacity 0.5s ease-out, transform 0.2s ease-in-out;
+            transform: scale(1);
+            transform-origin: center center;
+            position: absolute;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            display: none; /* All residues are hidden by default, shown by loadLevel */
+            color: #f0f0f0;
+            z-index: 10;
+            padding: 30px; /* Ajuste do padding interno */
+            box-sizing: border-box;
+        }
+
+        .residue img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        .residue:active {
+            cursor: grabbing;
+        }
+
+        /* Ajustado o zoom para ser menos agressivo já que os resíduos são menores */
+        .residue:not(.dragging):hover {
+            transform: scale(1.15);
+            z-index: 200;
+        }
+
+        .residue.dragging {
+            transform: scale(1.2);
+            opacity: 0.7;
+            z-index: 250;
+        }
+
+        .residue-tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            z-index: 180;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .residue:hover .residue-tooltip {
+            opacity: 1;
+            transform: translateY(-100%);
+        }
+
+        /* --- Collectors Container --- */
+        #collectors-container {
+            flex: none; /* Não cresce, ocupa o espaço necessário */
+            width: 100%; /* Ocupa a largura total do #game-container */
+            min-height: 220px; /* Altura mínima para os coletores */
+            display: flex;
+            flex-direction: row; /* Alinha os coletores horizontalmente */
+            flex-wrap: wrap; /* Permite que os coletores quebrem a linha se não houver espaço */
+            justify-content: center; /* Centraliza os coletores horizontalmente */
+            align-items: center; /* Centraliza os coletores verticalmente */
+            padding: 20px 10px; /* Ajuste do padding */
+            background-color: transparent;
+            box-sizing: border-box; /* Garante que padding e border sejam incluídos na width/height total */
+        }
+
+        .collector {
+            /* Autoajustável com um tamanho máximo */
+            width: 12vw; /* Ex: 10% da largura do viewport */
+            height: 10vw; /* Para manter a proporção */
+            max-width: 175px; /* Não maior que 150px */
+            max-height: 150px; /* Não maior que 150px */
+            min-width: 80px; /* Não menor que 80px */
+            min-height: 80px; /* Não menor que 80px */
+
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            margin: 5px 10px; /* Ajuste da margem para espaçar melhor */
+            font-weight: bold;
+            color: #e0e0e0;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            padding: 5px; /* Ajuste do padding interno */
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            box-sizing: border-box; /* Adicione também aqui para garantir o comportamento correto do layout */
+        }
+
+        .collector img {
+            max-width: 80%; /* Ajusta o tamanho da imagem do coletor para caber dentro do novo tamanho responsivo */
+            max-height: 80%; /* Ajusta o tamanho da imagem do coletor para caber dentro do novo tamanho responsivo */
+            object-fit: contain;
+            margin-bottom: 5px; /* Ajusta a margem da imagem */
+        }
+
+        .collector.highlight-red {
+            background-color: #ffebee;
+            border-color: #e57373;
+            animation: shake 0.5s;
+            animation-iteration-count: 1;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .score-feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            font-weight: bold;
+            animation: fade-up 1s forwards;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .score-feedback.positive {
+            color: #28a745;
+        }
+
+        .score-feedback.negative {
+            color: #dc3545;
+        }
+
+        @keyframes fade-up {
+            0% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, -100%); }
+        }
+
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 101;
+            color: white;
+            text-align: center;
+            transition: opacity 0.5s ease-out;
+            /* start-screen should be hidden by default if video intro is present */
+            display: none;
+        }
+
+        #start-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #start-screen h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        #start-button {
+            padding: 15px 30px;
+            font-size: 1.5em;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        #start-button:hover {
+            background-color: #218838;
+            transform: translateY(-2px);
+        }
+
+        #message-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px 40px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            z-index: 100;
+            min-width: 300px;
+            max-width: 600px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        #message-container.hidden {
+            display: none;
+        }
+
+        #game-message {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 25px;
+            color: #f0f0f0;
+        }
+
+        #final-score {
+            font-size: 1.5em;
+            color: #f0f0f0;
+            margin-bottom: 20px;
+        }
+
+        #restart-button {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #restart-button:hover {
+            background-color: #218838;
+        }
+
+        #restart-button.hidden {
+            display: none;
+        }
+
+        #next-level-button {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+        #next-level-button:hover {
+            background-color: #0056b3;
+        }
+        #next-level-button.hidden {
+            display: none;
+        }
+
+        #progress-container {
+            width: 90%;
+            max-width: 1200px;
+            height: 20px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #00e676;
+            border-radius: 10px;
+            transition: width 0.5s ease-in-out;
+        }
+
+        #mute-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+        #mute-button img {
+            display: block; /* Remove o espaço extra abaixo da imagem */
+        }
+    </style>
+</head>
+<body>
+    <button id="mute-button">
+        <img src="images/sound-on.png" alt="Som Ligado" id="mute-icon" width="50" height="50">
+    </button>
+
+    <div id="video-intro-container">
+        <p>Assista ao vídeo para entender mais sobre a **Coleta Seletiva** e sua importância!</p>
+        <iframe id="_ytplayer1610" allow="autoplay" width="1280" height="720" src="https://www.youtube.com/embed/XjWVmu7xlM8?autoplay=1&enablejsapi=1&origin=https://www.bing.com&rel=0&mute=0" frameborder="0" allowfullscreen="" data-bm="54" title="Coleta seletiva de residuos"></iframe>
+        <button id="skip-video-btn">Pular Introdução e Começar o Jogo</button>
+    </div>
+
+    <div id="start-screen" class="hidden">
+        <h2>Jogo da Coleta Seletiva</h2>
+        <p>Arraste os resíduos para as lixeiras corretas e teste seus conhecimentos!</p>
+        <button id="start-button">Começar Jogo</button>
+    </div>
+
+    <h1>Jogo da Coleta Seletiva</h1>
+
+    <div id="score-container">Pontos: <span id="current-score">0</span></div>
+    <div id="level-container">Nível: <span id="current-level">1</span></div>
+
+    <div id="game-container">
+        <div id="residues-container">
+            <div class="residue" id="Copo Plático" data-type="copo" draggable="true"><img src="images/residue-copo.png" alt="Copo"></div>
+
+            <div class="residue" id="Papel Toalha" data-type="papel" draggable="true"><img src="images/residue-papel1.png" alt="Papel 1"></div>
+            <div class="residue" id="Embalagem Tetra Pak" data-type="papel" draggable="true"><img src="images/residue-papel3.png" alt="Papel 3"></div>
+            <div class="residue" id="Papel Limpo" data-type="papel" draggable="true"><img src="images/residue-papel4.png" alt="Papel 4"></div>
+
+            <div class="residue" id="Saco Plástico" data-type="plastico" draggable="true"><img src="images/residue-plastico1.png" alt="Plástico 1"></div>
+            <div class="residue" id="Canudo Plástico" data-type="plastico" draggable="true"><img src="images/residue-plastico4.png" alt="Plástico 4"></div>
+
+
+            <div class="residue" id="Embalagem Vazia de Medicamento" data-type="nao-reciclavel" draggable="true"><img src="images/residue-nao-reciclavel1.png" alt="Não-Reciclável 1"></div>
+	   <div class="residue" id="Lixa Bertex" data-type="nao-reciclavel" draggable="true"><img src="images/residue-nao-reciclavel2.png" alt="Não-Reciclável 2"></div>
+	   <div class="residue" id="Lixa Rotorbital" data-type="nao-reciclavel" draggable="true"><img src="images/residue-nao-reciclavel3.png" alt="Não-Reciclável 3"></div>
+	   <div class="residue" id="Espuma Abrasiva" data-type="nao-reciclavel" draggable="true"><img src="images/residue-nao-reciclavel4.png" alt="Não-Reciclável 4"></div>
+	   <div class="residue" id="Filtro Partículas" data-type="nao-reciclavel" draggable="true"><img src="images/residue-nao-reciclavel5.png" alt="Não-Reciclável 5"></div>
+
+            <div class="residue" id="Embalagem Massa Poliéster" data-type="contaminados" draggable="true"><img src="images/residue-contaminado1.png" alt="Contaminado 1"></div>
+            <div class="residue" id="Embalagem de Solvente" data-type="contaminados" draggable="true"><img src="images/residue-contaminado2.png" alt="Contaminado 2"></div>
+            <div class="residue" id="Embalagem de Catalisador" data-type="contaminados" draggable="true"><img src="images/residue-contaminado3.png" alt="Contaminado 3"></div>
+            <div class="residue" id="Bola de Fita" data-type="contaminados" draggable="true"><img src="images/residue-contaminado4.png" alt="Contaminado 4"></div>
+            <div class="residue" id="Touca Descartável" data-type="contaminados" draggable="true"><img src="images/residue-contaminado5.png" alt="Contaminados 5"></div>
+            <div class="residue" id="Papel sujo de Tinta" data-type="contaminados" draggable="true"><img src="images/residue-contaminado6.png" alt="Contaminados 6"></div>
+            <div class="residue" id="Pedaço de Fita" data-type="contaminados" draggable="true"><img src="images/residue-contaminado7.png" alt="Contaminado 7"></div>
+
+            <div class="residue" id="Lata de Aluminio" data-type="metais" draggable="true"><img src="images/residue-metais1.png" alt="Metais 1"></div>
+
+            <div class="residue" id="Pano Pega Pó" data-type="pano" draggable="true"><img src="images/residue-pano1.png" alt="Pano 1"></div>
+
+            <div class="residue" id="Luvas Usadas" data-type="luva" draggable="true"><img src="images/residue-luva1.png" alt="Luva 1"></div>
+
+            <div class="residue" id="Cascas de Frutas" data-type="organico" draggable="true"><img src="images/residue-comida1.png" alt="Cascas de Frutas"></div>
+            <div class="residue" id="Sobras de Alimentos" data-type="organico" draggable="true"><img src="images/residue-comida2.png" alt="Sobras de Alimentos"></div>
+        </div>
+
+        <div id="collectors-container">
+            <div class="collector" id="collector-copo" data-accepts="copo">
+                <img src="images/copo-collector.png" alt="Coletor de Copo">
+                <span>Copo</span>
+            </div>
+            <div class="collector" id="collector-papel" data-accepts="papel">
+                <img src="images/papel-collector.png" alt="Coletor de Papel">
+                <span>Papel</span>
+            </div>
+            <div class="collector" id="collector-plastico" data-accepts="plastico">
+                <img src="images/plastico-collector.png" alt="Coletor de Plástico">
+                <span>Plástico</span>
+            </div>
+            <div class="collector" id="collector-nao-reciclavel" data-accepts="nao-reciclavel">
+                <img src="images/nao-reciclavel-collector.png" alt="Coletor de Não Reciclável">
+                <span>Não Reciclável</span>
+            </div>
+            <div class="collector" id="collector-contaminados" data-accepts="contaminados">
+                <img src="images/contaminados-collector.png" alt="Coletor de Contaminados">
+                <span>Contaminados</span>
+            </div>
+            <div class="collector" id="collector-pano" data-accepts="pano">
+                <img src="images/pano-collector.png" alt="Coletor de Pano">
+                <span>Pano</span>
+            </div>
+            <div class="collector" id="collector-luvas" data-accepts="luva">
+                <img src="images/luva-collector.png" alt="Coletor de Luvas">
+                <span>Luvas</span>
+            </div>
+            <div class="collector" id="collector-organico" data-accepts="organico">
+                <img src="images/organico-collector.png" alt="Coletor de Orgânico">
+                <span>Orgânico</span>
+            </div>
+            <div class="collector" id="collector-metais" data-accepts="metais">
+                <img src="images/metais-colletor.png" alt="Coletor de Metais">
+                <span>Metais</span>
+            </div>		
+        </div>
+    </div>
+
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div id="message-container" class="hidden">
+        <p id="game-message"></p>
+        <p id="final-score"></p>
+        <button id="restart-button" class="hidden">Reiniciar Jogo</button>
+        <button id="next-level-button" class="hidden">Próximo Nível</button>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const videoIntroContainer = document.getElementById('video-intro-container');
+        const youtubePlayer = document.getElementById('_ytplayer1610');
+        const skipVideoBtn = document.getElementById('skip-video-btn');
+
+        const startScreen = document.getElementById('start-screen'); // This will effectively be unused
+        const startButton = document.getElementById('start-button'); // This will effectively be unused
+
+        const gameContainer = document.getElementById('game-container');
+        const residuesContainer = document.getElementById('residues-container');
+        const collectors = document.querySelectorAll('.collector');
+        const messageContainer = document.getElementById('message-container');
+        const gameMessage = document.getElementById('game-message');
+        const restartButton = document.getElementById('restart-button');
+        const nextLevelButton = document.getElementById('next-level-button');
+        const currentScoreDisplay = document.getElementById('current-score');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const progressBar = document.getElementById('progress-bar');
+        const currentLevelDisplay = document.getElementById('current-level');
+        const scoreContainer = document.getElementById('score-container');
+        const levelContainer = document.getElementById('level-container');
+        const gameTitle = document.querySelector('h1');
+        const progressContainer = document.getElementById('progress-container');
+
+
+        let draggedItem = null;
+        let initialPositions = new Map();
+        let errorCount = 0;
+        let correctDrops = 0;
+        let score = 0;
+        let currentLevel = 1;
+        let totalResiduesInCurrentLevel = 0;
+        let lastCollectorHovered = null;
+        let isMuted = false; // Variável para controlar o estado do som
+
+        // Sons do jogo
+        const correctSound = new Audio('sounds/correct.mp3');
+        const wrongSound = new Audio('sounds/wrong.mp3');
+        const hoverSound = new Audio('sounds/hover.mp3');
+        const levelUpSound = new Audio('sounds/level.mp3');
+
+        // Armazenar todos os objetos de áudio para fácil controle
+        const allSounds = [correctSound, wrongSound, hoverSound, levelUpSound];
+
+        // Referências aos elementos do botão de mute
+        const muteButton = document.getElementById('mute-button');
+        const muteIcon = document.getElementById('mute-icon');
+
+        // Configuração dos Níveis
+        const levels = {
+            1: ['papel', 'plastico','nao-reciclavel'],
+            2: ['copo','luva' , 'metais'],
+            3: ['contaminados', 'pano', 'organico']
+        };
+        const maxLevels = Object.keys(levels).length;
+
+        // --- NEW: Function to show the game and hide the video intro ---
+        function showGame() {
+            // Hide the video container
+            videoIntroContainer.style.display = 'none';
+
+            // Remove the iframe from the DOM to stop playback and free resources
+            if (youtubePlayer && youtubePlayer.parentNode) {
+                youtubePlayer.parentNode.removeChild(youtubePlayer);
+            }
+
+            // Show game elements
+            gameContainer.style.display = 'flex'; // Use flex as defined in CSS
+            scoreContainer.style.display = 'block';
+            levelContainer.style.display = 'block';
+            gameTitle.style.display = 'block';
+            progressContainer.style.display = 'block';
+
+            // Initialize the game
+            initializeGame();
+        }
+
+        // --- NEW: Event listener for the skip video button ---
+        skipVideoBtn.addEventListener('click', showGame);
+
+        function initializeGame() {
+            errorCount = 0;
+            correctDrops = 0;
+            score = 0;
+            currentLevel = 1;
+            currentScoreDisplay.textContent = score;
+            currentLevelDisplay.textContent = currentLevel;
+            messageContainer.classList.add('hidden');
+            restartButton.classList.add('hidden');
+            nextLevelButton.classList.add('hidden');
+            gameMessage.textContent = '';
+            finalScoreDisplay.textContent = '';
+            progressBar.style.width = '0%';
+
+            collectors.forEach(collector => {
+                collector.classList.remove('highlight-red');
+            });
+
+            loadLevel(currentLevel);
+        }
+
+function loadLevel(levelNumber) {
+    document.querySelectorAll('.residue').forEach(residue => {
+        residue.style.display = 'none';
+        residue.style.opacity = '1';
+        residue.style.transform = 'scale(1)';
+        residue.style.transition = '';
+        residue.style.position = 'absolute';
+        const existingTooltip = residue.querySelector('.residue-tooltip');
+        if (existingTooltip) {
+            existingTooltip.remove();
+        }
+        // Remove a animação de flutuação para que não interfira no posicionamento inicial
+        residue.style.animation = 'none';
+    });
+
+    const residuesForThisLevel = [];
+    const typesForThisLevel = new Set();
+
+    for (let i = 1; i <= levelNumber; i++) {
+        if (levels[i]) {
+            levels[i].forEach(type => typesForThisLevel.add(type));
+        }
+    }
+
+    document.querySelectorAll('.residue').forEach(residue => {
+        if (typesForThisLevel.has(residue.dataset.type)) {
+            residuesForThisLevel.push(residue);
+        }
+    });
+
+    totalResiduesInCurrentLevel = residuesForThisLevel.length;
+    correctDrops = 0;
+    progressBar.style.width = `${(correctDrops / totalResiduesInCurrentLevel) * 100}%`;
+    currentLevelDisplay.textContent = currentLevel;
+
+    initialPositions.clear();
+    const containerRect = residuesContainer.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+
+    const residueMaxWidth = 220;
+    const residueMaxHeight = 220;
+
+    const safetyMargin = 30;
+
+    residuesForThisLevel.forEach((residue, index) => {
+        residue.style.display = 'flex';
+        residue.style.position = 'absolute';
+        residue.style.opacity = '1';
+        residue.style.transform = 'scale(1)';
+        residue.style.transition = '';
+
+        const availableWidth = containerWidth - residueMaxWidth - (safetyMargin * 2);
+        const availableHeight = containerHeight - residueMaxHeight - (safetyMargin * 2);
+
+        const actualAvailableWidth = Math.max(0, availableWidth);
+        const actualAvailableHeight = Math.max(0, availableHeight);
+
+        const randomLeft = (Math.random() * actualAvailableWidth) + safetyMargin;
+        const randomTop = (Math.random() * actualAvailableHeight) + safetyMargin;
+
+        residue.style.left = `${randomLeft}px`;
+        residue.style.top = `${randomTop}px`;
+
+        initialPositions.set(residue.id, { x: randomLeft, y: randomTop });
+        
+        // Aplica a animação de flutuação após posicionar o resíduo
+        // Usa um delay para criar um movimento mais dinâmico entre os resíduos
+        const randomDuration = 5 + Math.random() * 5; // Duração entre 5s e 10s
+        const randomDelay = Math.random() * 2; // Delay de até 2s
+        residue.style.animation = `float ${randomDuration}s ease-in-out ${randomDelay}s infinite`;
+    });
+}
+
+        function updateScore(points, collectorElement) {
+            score += points;
+            currentScoreDisplay.textContent = score;
+
+            const feedback = document.createElement('div');
+            feedback.textContent = (points > 0 ? '+' : '') + points;
+            feedback.classList.add('score-feedback');
+            feedback.classList.add(points > 0 ? 'positive' : 'negative');
+
+            collectorElement.appendChild(feedback);
+
+            feedback.addEventListener('animationend', () => {
+                feedback.remove();
+            });
+        }
+
+        function updateProgressBar() {
+            const progress = (correctDrops / totalResiduesInCurrentLevel) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+
+        document.querySelectorAll('.residue').forEach(residue => {
+            residue.addEventListener('mouseover', (e) => {
+                if (residue.style.display === 'none' || draggedItem === residue) return;
+                const tooltipText = residue.id;
+
+                let tooltip = residue.querySelector('.residue-tooltip');
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.classList.add('residue-tooltip');
+                    residue.appendChild(tooltip);
+                }
+                tooltip.textContent = tooltipText;
+
+                const tooltipHeight = tooltip.offsetHeight;
+                tooltip.style.left = '50%';
+                tooltip.style.top = `-${tooltipHeight + 10}px`;
+                tooltip.style.transform = 'translateX(-50%)';
+                tooltip.style.opacity = '1';
+            });
+
+            residue.addEventListener('mouseout', () => {
+                const tooltip = residue.querySelector('.residue-tooltip');
+                if (tooltip) {
+                    tooltip.style.opacity = '0';
+                    tooltip.style.transform = 'translateX(-50%) translateY(10px)';
+                    setTimeout(() => tooltip.remove(), 200);
+                }
+            });
+
+            residue.addEventListener('dragstart', (e) => {
+                draggedItem = residue;
+                e.dataTransfer.setData('text/plain', residue.id);
+                setTimeout(() => {
+                    residue.classList.add('dragging');
+                    const tooltip = residue.querySelector('.residue-tooltip');
+                    if (tooltip) {
+                        tooltip.remove();
+                    }
+                }, 0);
+            });
+
+            residue.addEventListener('dragend', () => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    if (draggedItem.style.display !== 'none') {
+                        draggedItem.style.opacity = '1';
+                    }
+                    draggedItem = null;
+                    lastCollectorHovered = null;
+                }
+            });
+        });
+
+        collectors.forEach(collector => {
+            collector.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (draggedItem && lastCollectorHovered !== collector.id) {
+                    if (!isMuted) { // Toca o som de hover apenas se não estiver mutado
+                        hoverSound.currentTime = 0;
+                        hoverSound.play();
+                    }
+                    lastCollectorHovered = collector.id;
+                }
+                collector.style.backgroundColor = '#dbe4eb';
+            });
+
+            collector.addEventListener('dragleave', () => {
+                collector.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                lastCollectorHovered = null;
+            });
+
+            collector.addEventListener('drop', (e) => {
+                e.preventDefault();
+                collector.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                lastCollectorHovered = null;
+
+                if (!draggedItem) return;
+
+                const residueType = draggedItem.dataset.type;
+                const collectorAccepts = collector.dataset.accepts;
+
+                if (residueType === collectorAccepts) {
+                    if (!isMuted) correctSound.play(); // Toca som apenas se não mutado
+                    updateScore(10, collector);
+                    correctDrops++;
+                    updateProgressBar();
+
+                    draggedItem.style.display = 'none';
+                    draggedItem.style.opacity = '1';
+                    draggedItem.style.transform = 'scale(1)';
+                    draggedItem.style.transition = '';
+
+                    if (correctDrops === totalResiduesInCurrentLevel) {
+                        if (currentLevel < maxLevels) {
+                            showGameEndMessage(true, "Nível Completo! Preparado para o próximo?");
+                            nextLevelButton.classList.remove('hidden');
+                            restartButton.classList.add('hidden');
+                            if (!isMuted) { // Toca som apenas se não mutado
+                                levelUpSound.currentTime = 0;
+                                levelUpSound.play();
+                            }
+                        } else {
+                            showGameEndMessage(true, "Parabéns! Você completou todos os níveis e possui responsabilidade com a Coleta Seletiva e o Meio Ambiente!");
+                            restartButton.classList.remove('hidden');
+                            nextLevelButton.classList.add('hidden');
+
+                            if (!isMuted) { // Toca som em loop apenas se não mutado
+                                levelUpSound.loop = true;
+                                levelUpSound.currentTime = 0;
+                                levelUpSound.play();
+                            }
+                        }
+                    }
+                } else {
+                    if (!isMuted) wrongSound.play(); // Toca som apenas se não mutado
+                    updateScore(-5, collector);
+                    errorCount++;
+                    collector.classList.add('highlight-red');
+                    setTimeout(() => {
+                        collector.classList.remove('highlight-red');
+                    }, 700);
+
+                    const initialPos = initialPositions.get(draggedItem.id);
+                    if (initialPos) {
+                        draggedItem.style.transition = 'left 0.5s ease-out, top 0.5s ease-out, transform 0.5s ease-out';
+                        draggedItem.style.left = `${initialPos.x}px`;
+                        draggedItem.style.top = `${initialPos.y}px`;
+                        draggedItem.style.transform = 'scale(1)';
+                        draggedItem.style.opacity = '1';
+
+                        setTimeout(() => {
+                            draggedItem.style.transition = '';
+                        }, 500);
+                    }
+
+                    if (errorCount === 1) { // Mensagem de erro aparece apenas na primeira vez por nível
+                        gameMessage.textContent = "Ops! Se está com dúvidas, pode consultar seu colega ou líder da área.";
+                        messageContainer.classList.remove('hidden');
+                        nextLevelButton.classList.add('hidden');
+                        restartButton.classList.add('hidden');
+                        setTimeout(() => {
+                            messageContainer.classList.add('hidden');
+                            gameMessage.textContent = '';
+                        }, 3000);
+                    }
+                }
+            });
+        });
+
+        function showGameEndMessage(isSuccess, message) {
+            messageContainer.classList.remove('hidden');
+            gameMessage.textContent = message;
+            // Pontuação máxima dinâmica
+            finalScoreDisplay.textContent = `Sua pontuação atual: ${score} de 460 pontos.`;
+            if (!isSuccess) {
+                restartButton.classList.remove('hidden');
+            }
+        }
+
+        // --- Mute Button Logic ---
+        muteButton.addEventListener('click', () => {
+            isMuted = !isMuted;
+            muteIcon.src = isMuted ? 'images/sound-off.png' : 'images/sound-on.png';
+            muteIcon.alt = isMuted ? 'Som Desligado' : 'Som Ligado';
+
+            allSounds.forEach(sound => {
+                sound.muted = isMuted;
+                // If muting, stop any currently playing sounds (especially looping ones)
+                if (isMuted) {
+                    sound.pause();
+                    sound.currentTime = 0;
+                }
+            });
+
+            // If we are unmuting and a level-up sound was looping, restart it
+            if (!isMuted && correctDrops === totalResiduesInCurrentLevel && currentLevel === maxLevels) {
+                levelUpSound.loop = true;
+                levelUpSound.play();
+            }
+        });
+
+        restartButton.addEventListener('click', () => {
+            messageContainer.classList.add('hidden');
+            // If levelUpSound was looping (end of game), stop it on restart
+            levelUpSound.loop = false;
+            levelUpSound.pause();
+            levelUpSound.currentTime = 0;
+            // Instead of initializeGame, reload the page to bring back the video intro
+            location.reload();
+        });
+
+        nextLevelButton.addEventListener('click', () => {
+            messageContainer.classList.add('hidden');
+            currentLevel++;
+            // Stop levelUpSound if it was playing for the current level completion
+            levelUpSound.pause();
+            levelUpSound.currentTime = 0;
+            loadLevel(currentLevel);
+        });
+
+        // The game now starts *after* the video intro is dismissed.
+        // So, we don't call initializeGame() here anymore directly.
+        // It's called by showGame().
+    });
+</script>
+</body>
+</html>
